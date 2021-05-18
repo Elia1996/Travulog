@@ -12,8 +12,11 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-package cv32e40p_pkg2_ft;
+`ifndef CV32E40P_PKG2
+`define CV32E40P_PKG2
+package cv32e40p_pkg2;
  
 TEMPLATE_PARAMETERS_DEFINITION
 
 endpackage
+`endif

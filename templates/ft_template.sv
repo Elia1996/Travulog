@@ -24,10 +24,10 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-import cv32e40p_pkg2_ft::*;
+import cv32e40p_pkg2::*;
 import cv32e40p_pkg::*;
 
-module MODULE_NAME_ft
+module MODULE_NAME
 	PARAMETER_DECLARATION BLOCK
 (
 
@@ -68,8 +68,8 @@ module MODULE_NAME_ft
 				INSTANCE BLOCK BLOCK_MODNAME_no_ft
 					PARAM=PARAM
 					IF clk rst_n IN=IN
-					IN=IN [0]
-					OUT = OUT [0]
+					IN= IN[0]
+					OUT = OUT[0]
 				END_INSTANCE
 				// Since we don't use FT can't be detected an
 				// error
@@ -84,8 +84,8 @@ module MODULE_NAME_ft
 							INSTANCE BLOCK BLOCK_MODNAME_single_input 
 								PARAM=PARAM
 								IF clk rst_n IN=IN
-								IN=IN [0] 
-								OUT = OUT _to_vote[i]
+								IN=IN[0] 
+								OUT = OUT_to_vote[i]
 							END_INSTANCE
 						end						
 					end
@@ -95,8 +95,8 @@ module MODULE_NAME_ft
 							INSTANCE BLOCK BLOCK_MODNAME_tiple_input
 								PARAM=PARAM
 								IF clk rst_n IN=IN
-								IN = IN [i]
-								OUT = OUT _to_vote[i]
+								IN = IN[i]
+								OUT = OUT_to_vote[i]
 							END_INSTANCE
 						end	
 					end

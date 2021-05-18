@@ -14,3 +14,7 @@
 	parameter PARAM_NAME_BREAKING_THRESHOLD = 3; 
 	parameter PARAM_NAME_COUNT_BIT = 8; 
 	parameter PARAM_NAME_INC_DEC_BIT = 2; 
+
+	parameter MAIN_MOD_ID_CURRENT_MOD_ID = MODULE_ORDER;
+
+	

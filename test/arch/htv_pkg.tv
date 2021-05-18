@@ -1,0 +1,11 @@
+IN_DIR /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/test/arch
+OUT_DIR /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/out
+TEMPLATE ft_template
+	FILE /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/templates/ft_template.sv
+	PARAM_FILE /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/templates/ft_template_parameters.sv
+END_TEMPLATE
+PKG_FILE /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/templates/cv32e40p_pkg2.sv
+PKG_OUT_FILE /media/tesla/Storage/Data/Scrivania/AllProject/Fare/Tesi/Esecuzione_tesi/Travulog/out/cv32e40p_pkg2.sv
+MODULE_PREFIX cv32e40p_
+        
+

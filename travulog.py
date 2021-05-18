@@ -28,26 +28,83 @@ from moddata import *
 #           Elabora un file Travulog utilizzando le proprietà dei vari moduli settati con SetModuleFilename
 #           ritornando il file trasformato.
 
+def CompressLineSpaceTabs(line):
+    return " ".join(line.strip().split()).strip()
 
-def GetInnerCommand(data_lines, lineno, key):
+
+def DeleteKeySplitLine(line, key):
+    line2 = DeleteKey(line,key)
+    return line2.split(" ")
+
+def DeleteKey(line, key):
+    line = CompressLineSpaceTabs(line)
+    return line.replace(key,"").strip()
+
+def CompressInstanceLine(line):
+    line_no_space = CompressLineSpaceTabs(line)
+    line1 = line_no_space.replace(".", " ").replace("(","#")
+    line2 = re.sub(r'\)\W*,' , ' ' , line1)
+    line2 = re.sub(r'\)\W*\)*' , ' ' , line2)
+    line3 = RemoveComments(line2)
+    line3 = line3.replace(" # ", "#")
+    line_compress = CompressLineSpaceTabs(line3)
+    return line_compress
+
+
+def SplitInstanceLine(line):
+    return CompressInstanceLine(line).split("#")
+
+
+def GetInnerCommand(data_lines, lineno, key1, key2=""):
     """
      This function return all text between lineno and the first occurrence
      of key, data_lines is a list of lines
     """
     i=lineno+1
     command=""
-    while not key in data_lines[i]:
-        command+=data_lines[i].strip() + "\n"
-        i+=1
-        if i > len(data_lines):
-            print("ERROR at line %d end keyword %s not found" % lineno, key)
-            exit(-1)
+    if key2 == "":
+        while not key1 in data_lines[i]:
+            command+=data_lines[i].strip() + "\n"
+            i+=1
+            if i > len(data_lines):
+                print("ERROR at line %d end keyword %s not found" % lineno, key)
+                exit(-1)
+    else:
+        while not ( key1 in data_lines[i] or key2 in data_lines[i]):
+            command+=data_lines[i].strip() + "\n"
+            i+=1
+            if i > len(data_lines):
+                print("ERROR at line %d end keyword %s not found" % lineno, key)
+                exit(-1)
+        command2=""
+        if  key1 in data_lines[i]:
+            while not key2 in data_lines[i]:
+                command2+=data_lines[i].strip() + "\n"
+                i+=1
+                if i > len(data_lines):
+                    print("ERROR at line %d end keyword %s not found" % lineno, key)
+                    exit(-1)
+        else:
+            command2= command
+            command=""
+
+        return [command, command2, i+1]
+
+
     return [command,i+1]
 
 def GetDeclarationForeach(block, inout, command, cmd2, lineno, indent):
     """
      This function create a declaration foreach IN, OUT or both of a block.
-     Cycling along input or/and output SIGNAME and BITINIT are substituted in "command" string
+     Cycling along input or/and output SIGNAME and BITINIT are substituted in "command" stringa
+     Considering the example:
+     //// DECLARATION_FOREACH MAIN_MODULE INTERN NOT clk rst_n
+     ////    logic [2:0]BITINIT SIGNAME_tr
+     //// REPLACE
+     block -> is the object of moddata (main module object)
+     inout -> is the type of signal on which cycle (INTERN)
+     command -> string in which replace elements (logic [2:0]BITINIT SIGNAME_tr)
+     cmd2 -> is a dictionary with second command ({"NOT":["clk", "rst_n"]})
     """
     data=""
     if inout == "IN" or inout == "IN_OUT":
@@ -71,6 +128,18 @@ def GetDeclarationForeach(block, inout, command, cmd2, lineno, indent):
                 data += indent
                 bitdef = CreateBitsDefinition(bit_dict)
                 data+= command.replace("INOUT","output").replace("SIGNAME",sig).replace("BITINIT",bitdef)
+
+    if inout == "INTERN":
+        for sig,bit_dict in zip(block.GetInternSigNamesList(), block.GetInternSigBitsList()):
+            ok=1
+            if "NOT" in cmd2.keys():
+                if sig in cmd2["NOT"]:
+                    ok=0
+            if ok==1:
+                data += indent
+                bitdef = CreateBitsDefinition(bit_dict)
+                data+= command.replace("INOUT","output").replace("SIGNAME",sig).replace("BITINIT",bitdef)
+
 
     if inout != "OUT" and inout != "IN" and inout != "IN_OUT":
         print("ERROR line %d, INOUT variable can be only IN,OUT or IN_OUT" % lineno)
@@ -118,119 +187,413 @@ def GetPrefixSuffix(what, sequence, key, lineno):
     return [prefix, suffix]
 
 
-def  SetSignalElaborationInstance(block_obj, siglist, inoutpar, after_equal, signal_elab, lineno):
-    """
-     This function elaborate a travulog instance statement like:
-       OUT = OUT _to_vote[i]
-     Argument are:
-     block -> It is the dict module info ot the block of which create instance
-     siglist -> This is the list of signals of which apply the prefix and suffix
-     inotpar -> This argument can be "IN" "OUT" or "PARAM", it indicated the type of signal
-               this information is used to verify if the siglist signals are correct
-    """
-
-    if inoutpar != "IN" and inoutpar != "OUT" and inoutpar != "PARAM":
-        print("ERROR line %d, only IN, OUT and PARAM is possible"%lineno)
+def CheckInoutCorrectAfterEqualReplaceInout(cmd,inout, lineno):
+    if inout != "IN" and inout != "OUT" and inout!="PARAM":
+        print("ERROR line %d, IF without IN,OUT or PARAM keyword, cmd : %s"%(lineno,cmd))
         exit(-1)
-    sigdict = {"IN":block_obj.GetInputSigNamesList(),  "OUT":block_obj.GetOutputSigNamesList(), "PARAM":block_obj.GetParameterNamesList()}
-    pre_suf = GetPrefixSuffix(inoutpar, after_equal, inoutpar,lineno)
-    append_list = []
-    flag=0
-    for sig in siglist:
-        if not sig in sigdict[inoutpar]:
-            print("WARNING line %d, signal %s isn't an %s signal of set block %s" %(lineno, sig, inoutpar, block_obj.GetModuleName()))
-            #print("%s signals of %s block are:"% (inoutpar,block['module']))
-            #print(json.dumps(sigdict[inoutpar], indent=4))
-            #exit(-1)
-        if len(signal_elab[inoutpar])==0:
-            append_list.append(sig)
-            flag=1
-        else:
-            thereis=0
-            for data in signal_elab[inoutpar]:
-                for sig1 in data[0]:
-                    if sig == sig1:
-                        thereis =1
-
-            if not thereis:
-                append_list.append(sig)
-                flag=1
-
-    if flag==1:
-        signal_elab[inoutpar].append([append_list,pre_suf])
-
-    return signal_elab
-
-
-def GetCmdInstance(block_obj,  command, instance_name, lineno, indent_level):
-    """
-     This function return an instance of a block, using "command" to correctly connect
-     instance, instance_name is the name of the instance while block is a
-     dictionary with info about the module
-    """
-    cmd_line=command.strip().split("\n")
-    data=""
-    signal_elab  = {"OUT":[],"IN":[],"PARAM":[]}
-    sigdict = {"IN":block_obj.GetInputSigNamesList(),  "OUT":block_obj.GetOutputSigNamesList(), "PARAM":block_obj.GetParameterNamesList()}
-
-    for cmd in cmd_line:
-        cmd_list=cmd.strip().split(" ")
-        if cmd_list[0] == "IF":
-            if not "IN" in cmd and not "OUT" in cmd and not "PARAM" in cmd and not "=" in cmd:
-                print("ERROR line %d, IF without IN,OUT or PARAM keyword"%lineno)
-                exit(-1)
-            else:
-                before_equal=cmd.split("=")[0].strip()
-                what = before_equal.strip().split(" ")[-1]
-                apply_to_list = before_equal.strip().split(" ")[1:-1]
-                equal_to=cmd.split("=")[1].strip()
-                sequence = equal_to.split(" ")
-                if what == "IN" or what == "OUT" or what == "PARAM":
-                    signal_elab = SetSignalElaborationInstance(block_obj, apply_to_list,what, sequence, signal_elab, lineno)
-                else:
-                    print("ERROR, line "+str(lineno)+", use IN, OUT and PARAM command only, not -"+what+"-")
-                    exit(-1)
-        elif "=" in cmd:
-                what=cmd.split("=")[0].strip()
-                equal_to=cmd.split("=")[1].strip()
-                sequence = equal_to.split(" ")
-                if what == "IN" or what == "OUT" or what == "PARAM":
-                    signal_elab = SetSignalElaborationInstance(block_obj, sigdict[what],what, sequence, signal_elab, lineno)
-                else:
-                    print("ERROR, line "+str(lineno)+", use IN, OUT and PARAM command only, not -"+what+"-")
-                    exit(-1)
-
-    module_name = block_obj.GetModuleName()
-    parameter = block_obj.GetParameterNamesList()
+    if inout == "IN":
+        if "OUT" in inout or "PARAM" in inout:
+            print("ERROR line %d, if you use %s before equal, you should use %s after equal to indicate signal"%(lineno,inout, inout))
+            exit(-1)
+    elif inout == "OUT":
+        if "IN" in inout or "PARAM" in inout:
+            print("ERROR line %d, if you use %s before equal, you should use %s after equal to indicate signal"%(lineno,inout, inout))
+            exit(-1)
+    else:
+        if "IN" in inout or "OUT" in inout:
+            print("ERROR line %d, if you use %s before equal, you should use %s after equal to indicate signal"%(lineno,inout, inout))
+            exit(-1)
     
-    input_port_connection_list= []
-    output_port_connection_list= []
-    in_n=0
-    for sig in block_obj.GetInputSigNamesList():
-        for sig_tc_list in signal_elab["IN"]:
-            for sig_tc in sig_tc_list[0]:
-                if sig == sig_tc:
-                    in_n+=1
-                    if sig_tc_list[1][0] == "UNIQUE":
-                        input_port_connection_list.append(sig_tc_list[1][1])
-                    else:
-                        input_port_connection_list.append(sig_tc_list[1][0]+sig+sig_tc_list[1][1])
+    return  cmd.replace(inout, "SIG")
 
-    for sig in block_obj.GetOutputSigNamesList():
-        for sig_tc_list in signal_elab["OUT"]:
-            for sig_tc in sig_tc_list[0]:
-                if sig == sig_tc:
-                    if sig_tc_list[1][0] == "UNIQUE":
-                        output_port_connection_list.append(sig_tc_list[1][1])
-                    else:
-                        output_port_connection_list.append(sig_tc_list[1][0]+sig+sig_tc_list[1][1])
+def SplitBracket(stringa):
+    str_split = stringa.replace("{","").replace("}","").split(",")
+    str_split_correct = []
+    for element in str_split:
+        str_split_correct.append(element.replace(" ",""))
 
-    #data += GetInstance(module_name, instance_name, parameter, vect1, vect2, indent, [in_n])
-    block_obj.SetInputPortConnections(input_port_connection_list)
-    block_obj.SetOutputPortConnections(output_port_connection_list)
-    data += block_obj.GetInstance(instance_name, indent_level)
+    return str_split_correct
 
+def GetInstanceInfo(text, real_line_start):
+    """ Return a dict containing all info of instance:
+    {"module_name": str, 
+     "instance_name": str, 
+     "param_connections" : { "param" : "connected_param" , ... },
+     "io_connections": { "signal": "connected_sig", ....},
+     "indent_int" : int}
+
+    """
+    if type(text) == list:
+        lines_l = text
+    else:
+        lines_l = text.split("\n")
+
+    info_dict = {"module_name": "", "instance_name":"", "param_connections": {} , "io_connections": {}, "indent_int":0}
+
+    line=""
+    oldline = line
+    start_line = 0
+    search_blockname = True
+    save_parameter = False
+    save_io = False
+    end_save = False
+    connection_set = False
+
+    real_lineno = real_line_start
+
+    for line in lines_l:
+        line= CompressLineSpaceTabs(line)
+
+        if "#(" in line and search_blockname:
+            current_line_indent = GetStringIndent(lines_l[real_lineno-real_line_start], 8)
+            info_dict["indent_int"] = current_line_indent
+            
+            if len(line.split(" ")) > 1:
+                if line.split(" ")[0] != "#(":
+                    mod_name = line.split(" ")
+                    search_blockname = False
+                    save_parameter = True
+                else:
+                    print("ERROR in parsing, line %d"% real_lineno)
+                    exit(-1)
+            else:
+                mod_name = oldline.split(" ")[0]
+                info_dict["module_name"] = mod_name
+
+                search_blockname = False
+                save_parameter = True
+
+        # We find the blockname witout
+        elif "(" in line and search_blockname:
+            if len(line) == 1:
+                if len(oldline.split(" ")) == 2:
+                    mod_name = oldline.split(" ")[0]
+                    info_dict["instance_name"] = oldline.split(" ")[1]
+                else:
+                    print("ERROR while parsing line %d" % real_lineno)
+                    exit(-1)
+            else:
+                if len(line.split(" ")) < 2:
+                    print("ERROR line %d while parsing" % real_lineno)
+                    exit(-1)
+                mod_name = line.split(" ")[0]
+                info_dict["instance_name"] = line.split(" ")[1].replace("(","")
+
+            search_blockname = False
+            save_io = True
+
+            info_dict["module_name"] = mod_name
+
+        # We save parameter connections
+        elif "." in line and save_parameter:
+            if re.findall("\)\W*,",line)!= [] or re.findall(r'\)\W*\)*', line)!=[]:
+                if len(re.findall(r'\)\W*\)', line)) != 0:
+                    save_parameter = False
+                    save_io = True
+                # We eliminate ( , ) and . from the line in order to have
+                # only the name of the port and of the signal to connect
+                line_param_list = SplitInstanceLine(line)
+                if len(line_param_list) != 2:
+                    print("ERROR in parser line %d, multiple instance on the same line not "
+                        "implemented in  the parser 1" % real_lineno)
+                    exit(-1)
+
+                # We create a list of dict where the key is the name of the parameter
+                # of module and the value is the connection do to, the dictionary is created because
+                # the order of connection can be different, we then reordered the list of connection
+                info_dict["param_connections"][line_param_list[0]] = line_param_list[1]
+
+            else:
+                print("ERROR line %d, multiple instance on the same line not implemented in"
+                        " the parser 2" % real_lineno)
+                exit(-1)
+
+        # We save io connections
+        elif (re.match("^\W+\..*", line)!= None or re.match("^\..*", line)!= None) and save_io:
+            if re.findall("\)\W*,",line)!= [] or re.findall(r'\)\W*\)*', line)!=[]:
+                # If we are in the last line of the declaration
+                if len(re.findall(r'\)\W*\)\W*;', line)) != 0:
+                    end_save = True
+                # split line
+                line_param_list = SplitInstanceLine(line)
+                # Verify that there is only  one declaration for line
+                if len(line_param_list) != 2:
+                    print("ERROR in parser line %d, multiple instance on the same line not "
+                        "implemented in  the parser 3" % real_lineno)
+                    exit(-1)
+                info_dict["io_connections"][line_param_list[0]] = line_param_list[1]
+
+            else:
+                print("ERROR line %d, multiple instance on the same line not implemented in"
+                        " the parser 4, %s " % (real_lineno, line))
+                exit(-1)
+
+        elif ")" in line and not ";" in line:
+            if len(SplitInstanceLine(line)) == 1:
+                if len(line) == 1:
+                    real_lineno +=1
+                    line = CompressLineSpaceTabs(lines_l[real_lineno-real_line_start])
+                    info_dict["instance_name"] = line.split(" ")[0].replace("(","")
+                else:
+                    info_dict["instance_name"] = line.replace(")","").replace("(","")
+            else:
+                if line.split(" ")[0] == ")":
+                    info_dict["instance_name"] = line.split(" ")[1].replace("(","")
+                else:
+                    info_dict["instance_name"] = line.split(" ")[0].replace(")","").replace("(","")
+
+            save_parameter = False
+            save_io = True
+
+        elif "(" in line and len(CompressLineSpaceTabs(line)) == 1:
+            save_parameter = False
+            save_io = True
+
+        elif re.findall(r'\)\W*;', line) != []:
+            end_save = True
+
+        oldline = line
+        real_lineno +=1
+
+    return info_dict
+
+
+def InstanceCommandParse(cmd_line, lineno, key = "////"):
+    """ Parse a connection string like:
+    IF clk rst_n IN = { IN_tr, IN_tr, tr_IN[0]}
+    Creating a dictionary like:
+    ["IN" , { "siglist":[ "clk", "rst_n"], "pattern": "{ PRECONSIG_trSUFCON, PRECONSIG_trSUFCON, PRECONtr_SIG[0]SUFCON }" ]
+    The you should replace PRECON and SUFCON with the prefix and the suffix of the connections and you
+    should replace SIG with the correct sig.
+    cmd_line -> line of command
+    lineno -> number of line in order to correctly prompt errors
+    """
+    if not "IN" in cmd_line and not "OUT" in cmd_line and not "PARAM" in cmd_line and not "=" in cmd_line:
+        print("ERROR line %d, IF without IN,OUT or PARAM keyword, line1: %s"%(lineno, cmd_line))
+        exit(-1)
+
+    cmd_line = DeleteKey(cmd_line, key)
+    # ex: IF clk rst_n IN = { IN_tr, IN_tr, tr_IN[0]}
+    before_equal = cmd_line.split("=")[0].strip().split(" ") # IF clk rst_n IN
+    after_equal = cmd_line.split("=")[1].strip()  # { IN_tr, IN_tr, tr_IN[0] }
+    #print("after_equal: -"+cmd_line+"-")
+    
+    inout = before_equal[-1]
+    if inout != "IN" and inout != "OUT" and inout!="PARAM":
+        print("ERROR line %d, IF without IN,OUT or PARAM keyword, line2 \"%s\""%(lineno,cmd_line))
+        exit(-1)
+
+    ######  IF parsing
+    command_list = []
+    if len(before_equal) > 1 and before_equal[0] != "IF": # ex: "IFF clk IN"  here IFF is wrong
+        print("ERROR line %d, before = you should only indicate IN/OUT/PARAM and optionally use \"IF list\""%lineno)
+        exit(-1)
+    if before_equal[0] == "IF" and len(before_equal)<3: # ex: "IF IN" here the string leak of sig list 
+        print("ERROR line %d, if you use IF you should indicate at least a signal"%lineno)
+        exit(-1)
+
+    if before_equal[0] == "IF":
+        command_list += before_equal[1:-1] # clk rst_n
+
+    ######  CONNECTION parsing
+    # cmd_str is a string that will be used as template to create the connection
+    # general form is:
+    #  PRECON PREFIX SIG SUFFIX SUFCON
+    # PRECON and SUFCON are prefix and suffix that are present in the instance
+    # connection, for example for the connection .addr (addr[0]) we have 
+    # PRECON="" and SUFCON="[0]", SUFFIX and PREFIX are added by the travulog command
+    # and placed near to the signal name
+    # If for example we have the command { IN_tr, IN_tr, tr_IN[0] }, cmd_str became
+    # { PRECONSIG_trSUFCON, PRECONSIG_trSUFCON, PRECONtr_SIG[0]SUFCON }
+    cmd_str = ""
+    if "," in after_equal:
+        if not "{" in after_equal or not "}" in after_equal:
+            print("ERROR line %d, after equal you can use {sig1, sig2, ...} but you forgot \"{ or }\""%lineno)       
+            exit(-1)
+        
+        after_equal = " ".join(after_equal.replace(","," ").replace("{","").replace("}","").strip().split())
+        after_equal = " ".join(CheckInoutCorrectAfterEqualReplaceInout(after_equal, inout, lineno).split())
+        # Create cmd_str
+        cmd_str += "{ "
+        end_str = " , "
+        cnt=0
+        for sig in after_equal.split(" "):
+            if cnt == len(after_equal.split(" "))-1:
+                end_str = " }"
+            cmd_str += "PRECON" + sig + "SUFCON " + end_str
+            cnt+=1
+
+
+    elif len(after_equal.split(" ")) != 1:
+        print("ERROR line %d, after equal you can use {sig1, sig2 , ... } or set a single signal with or without prefix and suffix, like : IN=prefix_IN_suffix, you write %s"%(lineno, after_equal))       
+        exit(-1)
+    else:
+        after_equal = CheckInoutCorrectAfterEqualReplaceInout(after_equal, inout, lineno)
+        cmd_str += "PRECON" + after_equal + "SUFCON"
+
+    return [inout , {"siglist":command_list,"pattern":cmd_str}]
+
+def GetCmdElab(block_obj, command, lineno, HTKEY = "////"):
+    """ Return a dictionary that contain connection trasformation
+    Basic structure of this dictionary is {"IN":[], "OUT":[], "PARAM":[]}
+
+    """
+    # I divide line and delete the htravulog key
+    cmd_lines = []
+    if type(command) == list:
+        for cm in command:
+            cmd_lines.append(DeleteKey(cm, HTKEY))
+    else:
+        cmd_line_old=command.strip().split("\n")
+        for cm in cmd_line_old:
+            cmd_lines.append(DeleteKey(cm, HTKEY))
+
+    ### Creation of the dictionary with pattern to apply at each port
+    cmd_dict = {"IN":[], "OUT":[], "PARAM":[]}
+    for cmd_line in cmd_lines:
+        if cmd_line != "":
+            [inout, connection_dict] = InstanceCommandParse(cmd_line, lineno, HTKEY)
+            cmd_dict[inout].append(connection_dict)
+
+    return cmd_dict
+
+def GetBitNumber(bit_dict, index, lineno):
+    if index != 0 and index != 1:
+        print("ERROR line %d, you can't use array, only \"logic [][] signame\" are valid"%lineno)
+        exit(-1)
+    if index == 0:
+        return int(abs(int(bit_dict["N0UP"])-int(bit_dict["N0DW"]))+1)
+    if index == 1:
+        return int(abs(int(bit_dict["N1UP"])-int(bit_dict["N1DW"]))+1)
+
+def GetCmdInstance(block_obj,  command, instance_name, lineno, indent_level, upper_block_obj = None, old_connection_dict=None , HTKEY = "////"):
+    block_obj = SetObjConnection(block_obj,  command, lineno, upper_block_obj, old_connection_dict , HTKEY)
+    data = block_obj.GetInstance(instance_name, indent_level)
     return data
+
+
+def SetObjConnection(block_obj,  command, lineno, upper_block_obj = None, old_connection_dict=None , HTKEY = "////"):
+    """ This function set input and output connection in the moddata obj called block_obj.
+    Arguments are:
+    block_obj -> moddata obj 
+    command -> It is a string containing the travulog or htravulog code that define the pattern of connection,
+            like "IF MAIN_MODULE_IN IN = {IN , IN , IN }
+        ////          IF NEW_IN IN = IN[MAIN_MODULE_PARAM_ID_PRCODE] 
+        ////          IN = IN_tr
+        ////          IF NEW_OUT OUT = OUT[MAIN_MODULE_PARAM_ID_PRCODE]
+        ////          OUT = OUT_tr"
+    lineno -> line used for errors
+    upper_block_obj -> Supponing to have a main module called if_stage and a submodule called if_pipeline, now if
+        we have changed some internal signals in if_stage that are used to connect if_pipeline, or the if_pipeline
+        input change dimension, we shoul correctly connect this changed signal. In this function is supported only
+        the case in which if_pipeline change dimension of output, if for example a input is triplicated, the corresponding
+        intern signal of the if_stage is connected three time in order to fill the if_pipeline input.
+    old_connection_dict -> Is a dictionary where each IO of the module is connected to a signal, for example if the instance
+        has a line like: ".branch_addr_i     ( {branch_addr_n[31:1], 1'b0} )," old_connection_dict will have an element like
+        { "branch_addr_i": "{branch_addr_n[31:1], 1'b0"}
+    """
+    cmd_dict = GetCmdElab(block_obj, command, lineno,  HTKEY) 
+    ### Creation of the connection signals
+    # INPUT
+    port_connection_list= {"IN":[], "OUT":[], "PARAM":[]}
+    
+
+    # FOR1 Cycle on input signal of instance 
+    for sig_tc_name, sig_tc_bit, sig_tc_type in zip(block_obj.GetAllIoSigName(), block_obj.GetAllIoSigBits(), block_obj.GetAllIoSigType()):
+        # FOR2 cycle on if dict {"siglist":command_list,"pattern":cmd_str]} using the type of signal to connect
+        for if_dict_of_sig in cmd_dict[sig_tc_type]:
+            # IF1  If the siglist is empty or it contain the signal name, we create connection as pattern said
+            if if_dict_of_sig["siglist"] == [] or  sig_tc_name in if_dict_of_sig["siglist"]:
+                # IF2  If the upper block is given we use previous connection
+                if upper_block_obj != None and old_connection_dict!= None:
+                    # We cycle in upper block signals to find what signal we should connect
+                    # if this signal is connected partially like:
+                    #     .branch_addr_i     ( {branch_addr_n[31:1], 1'b0} ),
+                    # We should find if branch_addr_i is changed in an array like [2:0][31:0], in this case
+                    # we should triplicate the connection like:
+                    #     .branch_addr_i     ( {branch_addr_n[2][31:1], 1'b0},{branch_addr_n[1][31:1], 1'b0},{branch_addr_n[0][31:1],1'b0}),
+                    # old_connection_dict contain all connection like {branch_addr_n[31:1], 1'b0} 
+                    # 
+                    for sig_name, sig_bit in zip(upper_block_obj.GetAllSigName(), upper_block_obj.GetAllSigBits()):
+                        if sig_name in old_connection_dict[sig_tc_name]:
+                            # If there is a simply connection like ".branch_addr_i (branch_addr)" we apply only the pattern
+                            # verifying that the bits are the same
+                            if sig_name == old_connection_dict[sig_tc_name]:
+                                newsig1 = if_dict_of_sig["pattern"].replace("SIG",sig_name + "INDEX")
+                                newsig1 = newsig1.replace("PRECON", "")
+                                newsig1 = newsig1.replace("SUFCON","")
+                            # If the connection is complex like ".branch_addr_i ( {branch_addr_n[31:1], 1'b0} )," we should
+                            # verify the number of bits and apply suffix correctly
+                            else:
+                                sig_split = old_connection_dict[sig_tc_name].split(sig_name) # [ '{' , '[31:1], 1'b0}' ]
+                                newsig1 = if_dict_of_sig["pattern"].replace("SIG",sig_name+"INDEX")
+                                newsig1 = newsig1.replace("PRECON", sig_split[0])
+                                newsig1 = newsig1.replace("SUFCON",sig_split[1])
+                        
+                            if sig_bit != sig_tc_bit:
+                                # If the first number of bit is equal we connect the signal like:
+                                #  .branch_addr_i ( { branch_addr_n, branch_addr_n, branch_addr_n } )
+                                correct=False
+                                if GetBitNumber(sig_tc_bit,1,lineno) != 1 and GetBitNumber(sig_bit,1,lineno) == 1:
+                                    bitn_tc = GetBitNumber(sig_tc_bit,1,lineno) 
+                                    bitn = GetBitNumber(sig_bit,1,lineno)
+                                    correct = True
+                                elif GetBitNumber(sig_tc_bit,1,lineno) == 1 and GetBitNumber(sig_bit,1,lineno) == 1:
+                                    bitn_tc = GetBitNumber(sig_tc_bit,0,lineno) 
+                                    bitn = GetBitNumber(sig_bit,0,lineno)
+                                    correct = True
+
+                                if correct :
+                                    if bitn_tc > bitn and bitn_tc % bitn == 0:
+                                        newsig = "{"
+                                        for i in range(bitn_tc//bitn-1, 0, -1):
+                                            newsig += newsig1.replace("INDEX","["+str(i)+"]") + " , "
+                                        newsig += newsig1.replace("INDEX","[0]") + "}"
+                                    else:
+                                        print("ERROR line %d, program can't manage the connection of sig %s [%s:%s][%s:%s]"
+                                            "with sig %s [%s:%s][%s:%s] number of bits 1 are not multiple (%d,%d)." %( lineno,
+                                            sig_name , sig_bit["N1UP"], sig_bit["N1DW"], sig_bit["N0UP"], sig_bit["N0DW"],
+                                            sig_tc_name, sig_tc_bit["N1UP"],sig_tc_bit["N1DW"], sig_tc_bit["N0UP"], sig_tc_bit["N0DW"],
+                                            bitn_tc, bitn)
+                                            )
+                                        exit(-1)
+                                else:
+                                    print("ERROR line %d, signal %s is a [%s:%s][%s:%s] sig while signal %s is a "
+                                        "[%s:%s][%s:%s] sig, verify connections!" 
+                                         % (lineno,
+                                        sig_name , sig_bit["N1UP"], sig_bit["N1DW"], sig_bit["N0UP"], sig_bit["N0DW"],
+                                        sig_tc_name, sig_tc_bit["N1UP"],sig_tc_bit["N1DW"], sig_tc_bit["N0UP"], sig_tc_bit["N0DW"])
+                                        )
+                                    exit(-1)
+                            else:
+                                newsig = newsig1.replace("INDEX","")
+                            
+                        # If sig_name isn't in old_connection_dict
+                        else:
+                            newsig1 = if_dict_of_sig["pattern"].replace("SIG",sig_tc_name )
+                            newsig1 = newsig1.replace("PRECON", "")
+                            newsig1 = newsig1.replace("SUFCON","")
+                            newsig = newsig1
+                    # END FOR
+                # END IF2 If we don't have upper object
+                else:
+                    newsig = if_dict_of_sig["pattern"].replace("SIG",sig_tc_name).replace("PRECON", "").replace("SUFCON","")
+
+                port_connection_list[sig_tc_type].append(newsig)
+                break
+            # END IF1
+        # END FOR2
+        else: 
+            port_connection_list[sig_tc_type].append(sig_tc_name)
+
+    # END FOR1
+            
+    block_obj.SetInputPortConnections(port_connection_list["IN"])
+    block_obj.SetOutputPortConnections(port_connection_list["OUT"])
+
+    return block_obj
+
+
 
 def GetInstanceForeach(block_obj, model_data, inout, lineno,indent):
     """
@@ -250,8 +613,12 @@ def GetInstanceForeach(block_obj, model_data, inout, lineno,indent):
     if inout == "OUT" or inout == "IN_OUT":
         names += block_obj.GetOutputSigNamesList()
         bits += block_obj.GetOutputSigBitsList()
-    if inout!="IN" and inout != "OUT" and inout !="IN_OUT":
-        print("ERROR at line %d, %s is wrong, only IN, OUT or IN_OUT can be used "%lineno, inout)
+    if inout == "INTERN":
+        names = block_obj.GetInternSigNamesList()
+        bits = block_obj.GetInternSigBitsList()
+
+    if inout!="IN" and inout != "OUT" and inout !="IN_OUT" and inout != "INTERN":
+        print("ERROR at line %d, %s is wrong, only IN, OUT, IN_OUT or INTERN can be used "%lineno, inout)
         exit(-1)
    
     index=0
@@ -498,6 +865,7 @@ class travulog:
         ####  Substitution of constant
         data = data_orig.replace("MODULE_NAME",module_name)
         data = data.replace("PARAM_NAME", param_name)
+        data = data.replace("MODULE_INDEX", param_name)
         # substitute all BLOCK_MODNAME with corrsipetive module name
         for mod_ID,mod_obj in zip(sf.mod_obj_dict.keys(), sf.mod_obj_dict.values()):
             data = data.replace(mod_ID+"_MODNAME", mod_obj.GetModuleNameNoPrefix())
@@ -533,7 +901,7 @@ class travulog:
                     exit(-1)
 
             elif "DECLARATION_FOREACH" in line_strip:
-                # DEyCLARATION_FOREACH BLOCK IN_OUT
+                # DECLARATION_FOREACH BLOCK IN_OUT
                 #    INOUT logic [2:0]BITINIT SIGNAME,
                 # END_DECLARATION_FOREACH
 

@@ -1,0 +1,11 @@
+IN_DIR BASEDIR/test/arch
+OUT_DIR BASEDIR/out
+TEMPLATE ft_template
+	FILE BASEDIR/templates/ft_template.sv
+	PARAM_FILE BASEDIR/templates/ft_template_parameters.sv
+END_TEMPLATE
+PKG_FILE BASEDIR/templates/cv32e40p_pkg2.sv
+PKG_OUT_FILE BASEDIR/out/cv32e40p_pkg2.sv
+MODULE_PREFIX cv32e40p_
+        
+

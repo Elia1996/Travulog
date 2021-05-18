@@ -12,13 +12,15 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-package cv32e40p_pkg2_ft;
+`ifndef CV32E40P_PKG2
+`define CV32E40P_PKG2
+package cv32e40p_pkg2;
  
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_program_counter_definition_ft        
+        // cv32e40p_program_counter_definition_ft_ft        
         //////////////////////////////////////////////////////////////////////
         parameter int PRCODE_FT = 1;
-        parameter int PRCODE_TIN = 1;
+        parameter int PRCODE_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>branch_addr_n
@@ -32,14 +34,17 @@ package cv32e40p_pkg2_ft;
         parameter PRCODE_COUNT_BIT = 8; 
         parameter PRCODE_INC_DEC_BIT = 2; 
 
-        parameter int IFST_PRCODE_I = 0;
+        parameter CVIFST_PRCODEFT = 0;
+
+        
+
 
 
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_prefetch_buffer_ft        
+        // cv32e40p_prefetch_buffer_ft_ft        
         //////////////////////////////////////////////////////////////////////
         parameter int PRBU_FT = 1;
-        parameter int PRBU_TIN = 1;
+        parameter int PRBU_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>fetch_valid_o
@@ -56,36 +61,42 @@ package cv32e40p_pkg2_ft;
         parameter PRBU_COUNT_BIT = 8; 
         parameter PRBU_INC_DEC_BIT = 2; 
 
-        parameter int IFST_PRBU_I = 1;
+        parameter CVIFST_PRBUFT = 1;
+
+        
+
 
 
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_if_stage_fsm_ft        
+        // cv32e40p_if_stage_fsm_logic_ft_ft        
         //////////////////////////////////////////////////////////////////////
-        parameter int IFSTFS_FT = 1;
-        parameter int IFSTFS_TIN = 1;
+        parameter int IFSTFSLO_FT = 1;
+        parameter int IFSTFSLO_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>branch_req
         // TOUT[1]-refers-to->>fetch_ready
         // TOUT[2]-refers-to->>perf_imiss_o
-        parameter int IFSTFS_TOUT [2:0] = {  0, 0, 0 }; 
+        parameter int IFSTFSLO_TOUT [2:0] = {  0, 0, 0 }; 
 
         // Parameter for breakage monitors
-        parameter IFSTFS_DECREMENT = 1; 
-        parameter IFSTFS_INCREMENT = 1; 
-        parameter IFSTFS_BREAKING_THRESHOLD = 3; 
-        parameter IFSTFS_COUNT_BIT = 8; 
-        parameter IFSTFS_INC_DEC_BIT = 2; 
+        parameter IFSTFSLO_DECREMENT = 1; 
+        parameter IFSTFSLO_INCREMENT = 1; 
+        parameter IFSTFSLO_BREAKING_THRESHOLD = 3; 
+        parameter IFSTFSLO_COUNT_BIT = 8; 
+        parameter IFSTFSLO_INC_DEC_BIT = 2; 
 
-        parameter int IFST_IFSTFS_I = 2;
+        parameter CVIFST_IFSTFSLOFT = 2;
+
+        
+
 
 
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_if_pipeline_ft        
+        // cv32e40p_if_pipeline_ft_ft        
         //////////////////////////////////////////////////////////////////////
         parameter int IFPI_FT = 1;
-        parameter int IFPI_TIN = 1;
+        parameter int IFPI_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>instr_valid_id_o
@@ -104,14 +115,17 @@ package cv32e40p_pkg2_ft;
         parameter IFPI_COUNT_BIT = 8; 
         parameter IFPI_INC_DEC_BIT = 2; 
 
-        parameter int IFST_IFPI_I = 3;
+        parameter CVIFST_IFPIFT = 3;
+
+        
+
 
 
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_aligner_ft        
+        // cv32e40p_aligner_ft_ft        
         //////////////////////////////////////////////////////////////////////
         parameter int AL_FT = 1;
-        parameter int AL_TIN = 1;
+        parameter int AL_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>aligner_ready_o
@@ -127,14 +141,17 @@ package cv32e40p_pkg2_ft;
         parameter AL_COUNT_BIT = 8; 
         parameter AL_INC_DEC_BIT = 2; 
 
-        parameter int IFST_AL_I = 4;
+        parameter CVIFST_ALFT = 4;
+
+        
+
 
 
         //////////////////////////////////////////////////////////////////////
-        // cv32e40p_compressed_decoder_ft        
+        // cv32e40p_compressed_decoder_ft_ft        
         //////////////////////////////////////////////////////////////////////
         parameter int CODE_FT = 1;
-        parameter int CODE_TIN = 1;
+        parameter int CODE_TIN = 0;
         // TOUT is referred to output signal in order of definition
         //
         //  TOUT[0]-refers-to->>instr_o
@@ -149,9 +166,13 @@ package cv32e40p_pkg2_ft;
         parameter CODE_COUNT_BIT = 8; 
         parameter CODE_INC_DEC_BIT = 2; 
 
-        parameter int IFST_CODE_I = 5;
+        parameter CVIFST_CODEFT = 5;
+
+        
+
 
 
 
 
 endpackage
+`endif

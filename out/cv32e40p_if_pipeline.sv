@@ -27,6 +27,8 @@ module cv32e40p_if_pipeline
         logic                    if_ready ;
 
 
+        ////
+
 
         // IF-ID pipeline registers, frozen when the ID stage is stalled
         always_ff @(posedge clk, negedge rst_n)

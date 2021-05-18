@@ -24,7 +24,7 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-import cv32e40p_pkg2_ft::*;
+import cv32e40p_pkg2::*;
 import cv32e40p_pkg::*;
 
 module cv32e40p_aligner_ft

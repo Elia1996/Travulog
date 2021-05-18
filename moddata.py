@@ -85,14 +85,14 @@ def GetBits(string):
     if "[" in string:
         lista = string.split(":")
         if len(lista) == 2:
-            return {"N0UP":lista[0].split("[")[-1], "N0DW":"0" }
+            return {"N0UP":lista[0].split("[")[-1], "N0DW":"0", "N1UP":"0", "N1DW":"0" }
         elif len(lista) == 3:
             return {"N1UP":lista[0].split("[")[-1], "N1DW":"0" ,"N0UP":lista[1].split("[")[-1],"N0DW":"0" }
         else:
             print("ERROR in GetBits, more then two dimension not are supported")
             exit(-1)
     else:
-        return {"N0UP":"0", "N0DW":"0" }
+        return {"N0UP":"0", "N0DW":"0" ,"N1UP":"0", "N1DW":"0"}
 
 
 def GetParamBase(name_or_list):
@@ -180,6 +180,7 @@ class moddata:
         sf.filename = filename
         sf.indent=indent
         sf.mod_prefix = module_prefix
+        sf.intern_sig_block = ""
         sf.IN_ID = "IN"
         sf.OUT_ID = "OUT"
         sf.INTERN_ID = "INTERN"
@@ -201,21 +202,30 @@ class moddata:
                     "sig_input_bits_diff":[],\
                     "sig_output_name_diff":[], \
                     "sig_output_bits_diff":[],\
-                    "verilog_block":""}    
+                    "verilog_block":"",\
+                    "before_module":""}    
 
     #########################################################################################################
     # SET FUNCTION
     #########################################################################################################
+    def SetModulePrefix(sf, prefix):
+        sf.mod_prefix = prefix
+
+    def SetBeforeModule(sf, text):
+        sf.modinfo["before_module"] = text
+
+    def SetInternSigBlock(sf, text):
+        sf.intern_sig_block = text
 
     def SetVerilogBlock(sf, verilog_block):
         sf.modinfo["verilog_block"] = verilog_block
 
+    def AppendVerilogLine(sf, verilog_line):
+        sf.modinfo["verilog_block"] += verilog_line
+
     def SetModuleName(sf, module_name):
         sf.modinfo["module"] = module_name
 
-    def DeleteInternSigs(sf):
-        sf.modinfo["sig_intern_name"] = []
-        sf.modinfo["sig_intern_bits"] = []
 
     def SetImportList(sf, import_list):
         sf.modinfo["import_list"] = import_list
@@ -348,14 +358,23 @@ class moddata:
                 sf.modinfo["sig_intern_name"].append(sig_name)
                 sf.modinfo["sig_intern_bits"].append(sig_bits)
 
+    #########################################################################################################
+    # Deletion FUNCTION
+    #########################################################################################################
 
+    def DeleteVerilogBlock(sf):
+        sf.modinfo["verilog_block"] = ""
+
+    def DeleteInternSigs(sf):
+        sf.modinfo["sig_intern_name"] = []
+        sf.modinfo["sig_intern_bits"] = []
 
     #########################################################################################################
     # Elaboration FUNCTION
     #########################################################################################################
 
 
-    def Analyze(sf, moddata_similar=0):
+    def Analyze(sf, moddata_similar=0, hravulog=False):
         """ Return none
         This function analyze the verilog file (set in object init) and it saves info
         about the module.
@@ -385,13 +404,24 @@ class moddata:
         sig_intern_bits = [] 
         import_list = []
 
+        sf.sections_lines = {"before_module":[0,0], "io":[0,0], "intern":[0,0], "verilog_block":[0,0] }
+
         cnt=0
+        lineno=0
         save_intern_signals=0
+        save_before_module=True
+        end_iodecl=False
+
         for line in fp.readlines():
+            comment_line = line
             line = RemoveComments(line)
             line = line.replace("\t"," ")
             if "import " in line:
                 import_list.append(line)
+            if ");" in line and not end_iodecl:
+                sf.sections_lines["io"][1] = lineno
+                sf.sections_lines["intern"][0] = lineno+1
+
             if not save_intern_signals:
                 if (" input " in line) or (" output " in line):
                     real_line = " ".join(line.split()).replace(',','')
@@ -413,6 +443,9 @@ class moddata:
                         sig_output_bits.append(GetBits(line))
                 if re.match(mod_patt,line):
                     module = line.split(" ")[1].strip()
+                    save_before_module=False
+                    sf.sections_lines["before_module"] = [0,lineno]
+                    sf.sections_lines["io"]  = [lineno+1,0]
 
                 if re.match("^\W*parameter.*", line):
                     real_line=" ".join(line.split()).strip()
@@ -434,17 +467,32 @@ class moddata:
                         if not "[" in word:
                             sig_intern_name.append(word)
                             sig_intern_bits.append(GetBits(line))
+                    decl_line=lineno
+                
+                if "END_DECLARATIONS" in comment_line:
+                    decl_line = lineno
+                
+
+            if save_before_module:
+                sf.modinfo["before_module"] += line
 
             if cnt==0 and "#(" in line:
                 cnt+=1
-            elif cnt==1 and ")" in line:
-                cnt+=1
-            elif cnt==2 and "(" in line:
+            elif ( cnt==2 or cnt==0 ) and "(" in line:
                 cnt+=1
             # end for
-            elif cnt==3 and ");" in line:
+            elif ( cnt==3 or cnt == 1 ) and ");" in line:
+                end_iodecl = True
+                decl_line = lineno
                 save_intern_signals=1
                 cnt+=1
+            elif cnt==1 and ")" in line:
+                cnt+=1
+
+            lineno+=1
+
+        sf.sections_lines["intern"][1] = decl_line
+        sf.sections_lines["verilog_block"] = [decl_line+1,lineno-1]
 
         sf.modinfo={"module":module,\
                     "import_list":import_list,\
@@ -474,6 +522,22 @@ class moddata:
     #########################################################################################################
     # GET FUNCTION
     #########################################################################################################
+
+    def GetAllIds(sf):
+        return  [sf.IN_ID, sf.OUT_ID, sf.INTERN_ID, sf.INDIFF_ID, sf.OUTDIFF_ID, sf.PARAM_ID]
+
+    def GetBeforeModuleLines(sf):
+        return sf.sections_lines["before_module"]
+
+    def GetIoLines(sf):
+        return sf.sections_lines["io"]
+
+    def GetInternLines(sf):
+        return sf.sections_lines["intern"]
+
+    def GetVerilogBlockLines(sf):
+        return sf.sections_lines["verilog_block"]
+
     
     def GetModuleName(sf):
         return sf.modinfo["module"]
@@ -518,13 +582,39 @@ class moddata:
         return sf.modinfo["sig_intern_bits"]
 
     def GetAllIoSigName(sf):
-        return sf.GetInputSigNamesList() + sf.GetOutputSigNamesList() 
+        return sf.GetInputSigNamesList() + sf.GetOutputSigNamesList()  
 
     def GetAllIoSigBits(sf):
         return sf.GetInputSigBitsList() + sf.GetOutputSigBitsList() 
+    def GetAllIoSigType(sf):
+        ret = []
+        for sig in sf.GetInputSigNamesList():
+            ret.append(sf.IN_ID)
+
+        for sig in sf.GetOutputSigNamesList():
+            ret.append(sf.OUT_ID)
+        
+        return ret
+    def GetAllDiffSigName(sf):
+        return sf.GetInputSigDiffNamesList() + sf.GetOutputSigDiffNamesList()
+
+    def GetAllDiffSigType(sf):
+        ret = []
+        for sig in sf.GetInputSigDiffNamesList():
+            ret.append(sf.INDIFF_ID)
+
+        for sig in sf.GetOutputSigDiffNamesList():
+            ret.append(sf.OUTDIFF_ID)
+        
+        return ret
+
 
     def GetAllSigName(sf):
         return sf.GetInputSigNamesList() + sf.GetOutputSigNamesList() + sf.GetInternSigNamesList() 
+    
+    def GetAllSigBits(sf):
+        return sf.GetInputSigBitsList() + sf.GetOutputSigBitsList() + sf.GetInternSigBitsList()
+
 
     def GetAllConnectionSigNameAndBits(sf):
         conn_list = sf.input_port_connection_list
@@ -589,6 +679,7 @@ class moddata:
 
     def GetImportList(sf):
         return sf.modinfo["import_list"]
+
 
     def AppendInternSig(sf, name, bits):
         sf.modinfo["sig_intern_name"].append(name)
@@ -809,17 +900,23 @@ class moddata:
         declaration_str += ");\n"
 
         #### INTERNAL signals
-        declaration_str += sf.GetPortIoFromList(sf.GetInternSigNamesList())
+        if sf.intern_sig_block != "":
+            declaration_str += sf.intern_sig_block
+        else:
+            declaration_str += sf.GetPortIoFromList(sf.GetInternSigNamesList())
 
         return declaration_str
 
     def GetCompleteVerilog(sf):
         datafile = ""
         if sf.VerilogBlockExist():
+            if "before_module" in sf.modinfo.keys():
+                datafile += sf.modinfo["before_module"]
             #### IMPORTS
             if sf.GetImportList() != []:
                 for impo in sf.GetImportList():
-                    datafile += impo + "\n"
+                    if not impo.strip() in datafile.split("\n"):
+                        datafile += impo + "\n"
             datafile += "\n\n"
             datafile += "module " + sf.GetModuleName() + "\n"
             datafile += sf.GetDeclaration()

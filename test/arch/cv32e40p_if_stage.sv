@@ -23,9 +23,17 @@
 // Description:    Instruction fetch unit: Selection of the next PC, and      //
 //                 buffering (sampling) of the read instruction               //
 //                                                                            //
-////////////////////////////////////////////////////////////////////////////////
-import cv32e40p_pkg::*;
+/////////////////////////////////////////////////////////////////////////////////
 
+
+//// IMPORT htv_pkg.tv
+
+import cv32e40p_pkg::*;
+//// ADD_LINE import cv32e40p_pkg2::*;
+
+
+//// NEW_MODULE_NAME cv32e40p_if_stage
+//// NEW_MODULE_FILE OUT_DIR/cv32e40p_if_stage_ft.sv
 
 module cv32e40p_if_stage
 #(
@@ -102,7 +110,6 @@ module cv32e40p_if_stage
 	output logic        perf_imiss_o           // Instruction Fetch Miss
 );
 
-
 	logic              if_valid, if_ready;
 
 	// prefetch buffer related signals
@@ -129,23 +136,79 @@ module cv32e40p_if_stage
 	logic              instr_compressed_int;
 
 
+	assign if_busy_o       = prefetch_busy;
+	assign fetch_failed    = 1'b0; // PMP is not supported in CV32E40P
+	
+	//// FOREACH MAIN_MOD_INTERN
+	////    logic [2:0]BITINIT SIGNAME_tr;
+	//// END_FOREACH
+	
+	//// FOREACH MAIN_MOD_OUT NOT if_busy_o
+	//// 	logic [2:0]BITINIT SIGNAME_tr;
+	//// END_FOREACH
+
+ 	//// FOREACH MAIN_MOD_OUT NOT if_busy_o
+	//// 	assign SIGNAME = SIGNAME_tr[0];
+	//// END_FOREACH
+	
+	//// FOREACH NEW_OUT
+	//// 	logic [5:0]BITINIT SIGNAME_ft;
+	//// END_FOREACH
+	
+	//// FOREACH NEW_IN NOT clk rst_n
+	//// 	logic [5:0]BITINIT SIGNAME_ft;
+	//// 	assign SIGNAME_ft = {3'b0, 3'b0, 3'b0, 3'b0, 3'b0, 3'b0};
+	//// END_FOREACH
+	
+	//// FOREACH prefetch_busy 
+	//// 	assign if_busy_o = SIGNAME_tr[0];
+	//// END_FOREACH
+	
+	//// FOREACH fetch_failed
+	////	assign SIGNAME_tr = {1'b0, 1'b0, 1'b0};
+	//// END_FOREACH
+	
+
+	
+	////////////////////////////////////////////////////////////
+	//// END_DECLARATIONS
+	///////////////////////////////////////////////////////////
+
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template
+	//// INFILE OUT_DIR/cv32e40p_program_counter_definition.sv
+	//// OUTFILE OUT_DIR/cv32e40p_program_counter_definition_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////          IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////          IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID] 
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
+
+	////	 CREATE_MODULE cv32e40p_program_counter_definition
+	////	 OUTFILE OUT_DIR/cv32e40p_program_counter_definition.sv
+	////	
+	////	 IN m_exc_vec_pc_mux_i 
+	////	    u_exc_vec_pc_mux_i
+	////	    trap_addr_mux_i 
+	////	    exc_pc_mux_i
+	////	    dm_halt_addr_i 
+	////	    m_trap_base_addr_i u_trap_base_addr_i 
+	////	 	  boot_addr_i
+	////	    dm_exception_addr_i
+	////	    jump_target_id_i
+	////	    jump_target_ex_i
+	////	    mepc_i uepc_i depc_i pc_id_o 
+	////	    hwlp_target_i
+	////	    pc_set_i pc_mux_i
+	////	 END_IN
+	////	 OUT branch_addr_n
+	////	    csr_mtvec_init_o
+	////	 END_OUT
+	
 	// exception PC selection mux
-	//// CREATE_FT_BLOCK ft_template cv32e40p_program_counter_definition
-	//// IN m_exc_vec_pc_mux_i 
-	////    u_exc_vec_pc_mux_i
-	////    trap_addr_mux_i 
-	////    exc_pc_mux_i
-	////    dm_halt_addr_i 
-	////    m_trap_base_addr_i u_trap_base_addr_i 
-	//// 	  boot_addr_i
-	////    dm_exception_addr_i
-	////    jump_target_id_i
-	////    jump_target_ex_i
-	////    mepc_i uepc_i depc_i pc_id_o 
-	////    hwlp_target_i
-	////    pc_set_i pc_mux_i
-	//// OUT branch_addr_n
-	////    csr_mtvec_init_o
 	always_comb
 		begin : EXC_PC_MUX
 			unique case (trap_addr_mux_i)
@@ -192,13 +255,25 @@ module cv32e40p_if_stage
 	// tell CS register file to initialize mtvec on boot
 	assign csr_mtvec_init_o = (pc_mux_i == PC_BOOT) & pc_set_i;
 
-	//// END_CREATE_FT_BLOCK
+	//// 	END_CREATE_MODULE
+	//// END_ADD_MODULE_LAYER
 
-	assign fetch_failed    = 1'b0; // PMP is not supported in CV32E40P
 
 	// prefetch buffer, caches a fixed number of instructions
-	//
-	//// INSTANCE_AND_BLOCK_TO_FT ft_template cv32e40p_prefetch_buffer.sv
+	
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template 
+	//// INFILE IN_DIR/cv32e40p_prefetch_buffer.sv
+	//// OUTFILE OUT_DIR/cv32e40p_prefetch_buffer_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////	      IF branch_addr_n IN = {IN_tr[2] , IN_tr[1] , IN_tr[0] }
+	////	      IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////          IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID] 
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
 	cv32e40p_prefetch_buffer
 	#(
 		.PULP_OBI          ( PULP_OBI                    ),
@@ -233,18 +308,35 @@ module cv32e40p_if_stage
 		// Prefetch Buffer Status
 		.busy_o            ( prefetch_busy               )
 	);
-	//// END_INSTANCE_AND_BLOCK_TO_FT
+	//// END_ADD_MODULE_LAYER
 
 
-	//// CREATE_FT_BLOCK ft_template cv32e40p_if_stage_fsm
-	//// IN pc_set_i
-	////    fetch_valid
-	////    req_i
-	////    if_valid
-	////    aligner_ready
-	//// OUT branch_req
-	//// 	   fetch_ready
-	////     perf_imiss_o
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template 
+	//// INFILE OUT_DIR/cv32e40p_if_stage_fsm_logic.sv
+	//// OUTFILE OUT_DIR/cv32e40p_if_stage_fsm_logic_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////	      IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////          IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID] 
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
+	
+	////	 CREATE_MODULE cv32e40p_if_stage_fsm_logic
+	////	 OUTFILE OUT_DIR/cv32e40p_if_stage_fsm_logic.sv
+	////	
+	////	 IN pc_set_i
+	////	    fetch_valid
+	////	    req_i
+	////	    if_valid
+	////	    aligner_ready
+	////	 END_IN
+	////	 OUT branch_req
+	////	 	   fetch_ready
+	////	     perf_imiss_o
+	////	 END_OUT
 
 	// offset FSM state transition logic
 	always_comb
@@ -264,12 +356,26 @@ module cv32e40p_if_stage
 	end
 
 	assign perf_imiss_o    = (~fetch_valid) | branch_req;
+	////	 END_CREATE_MODULE
+	//// END_ADD_MODULE_LAYER
 
-	//// END_CREATE_FT_BLOCK
 
-	assign if_busy_o       = prefetch_busy;
-
-	//// CREATE_FT_BLOCK ft_template_ECC cv32e40p_if_pipeline
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template 
+	//// INFILE OUT_DIR/cv32e40p_if_pipeline.sv
+	//// OUTFILE OUT_DIR/cv32e40p_if_pipeline_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////	      IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////          IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID] 
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
+	
+	//// CREATE_MODULE cv32e40p_if_pipeline 
+	//// OUTFILE OUT_DIR/cv32e40p_if_pipeline.sv
+	////
 	//// IN rst_n
 	////    instr_decompressed
 	////    instr_compressed_int
@@ -282,6 +388,7 @@ module cv32e40p_if_stage
 	////    illegal_c_insn
 	////    fetch_valid
 	////    clk
+	//// END_IN
 	//// OUT instr_valid_id_o
 	////     instr_rdata_id_o
 	////     is_fetch_failed_o
@@ -289,6 +396,7 @@ module cv32e40p_if_stage
 	////     is_compressed_id_o
 	////     illegal_c_insn_id_o
 	////     if_valid
+	//// END_OUT
 
 
 	// IF-ID pipeline registers, frozen when the ID stage is stalled
@@ -324,10 +432,24 @@ module cv32e40p_if_stage
 	assign if_ready = fetch_valid & id_ready_i;
 	assign if_valid = (~halt_if_i) & if_ready;
 
-	//// END_CREATE_FT_BLOCK
+	//// END_CREATE_MODULE
+	//// END_ADD_MODULE_LAYER
 
 
-	//// INSTANCE_AND_BLOCK_TO_FT ft_template cv32e40p_aligner.sv
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template 
+	//// INFILE IN_DIR/cv32e40p_aligner.sv
+	//// OUTFILE OUT_DIR/cv32e40p_aligner_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////	      IF branch_addr_n IN = {IN_tr[2] ,IN_tr[1], IN_tr[0]}
+	//// 	      IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	////	      IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////	      IF NEW_IN IN = IN_tr
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
 	cv32e40p_aligner aligner_i
 	(
 		.clk               ( clk                          ),
@@ -345,9 +467,20 @@ module cv32e40p_if_stage
 		.pc_o              ( pc_if_o                      )
 	);
 
-	//// END_INSTANCE_AND_BLOCK_TO_FT
+	//// END_ADD_MODULE_LAYER
 
-	//// INSTANCE_AND_BLOCK_TO_FT ft_template cv32e40p_compressed_decoder.sv
+	//// ADD_MODULE_LAYER 
+	//// TEMPLATE ft_template 
+	//// INFILE IN_DIR/cv32e40p_compressed_decoder.sv
+	//// OUTFILE OUT_DIR/cv32e40p_compressed_decoder_ft.sv
+	////
+	//// CONNECT  IF clk rst_n IN = IN
+	////	      IF NEW_IN IN = IN_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	////	      IF MAIN_MOD_IN IN = {IN , IN , IN }
+	////	      IN = IN_tr
+	////	      IF NEW_OUT OUT = OUT_ft[MAIN_MOD_ID_CURRENT_MOD_ID]
+	//// 	      OUT = OUT_tr	
+	//// END_CONNECT
 	cv32e40p_compressed_decoder
 	#(
 		.FPU(FPU)
@@ -361,7 +494,7 @@ module cv32e40p_if_stage
 		.is_compressed_o ( instr_compressed_int ),
 		.illegal_instr_o ( illegal_c_insn       )
 	);	
-	//// END_INSTANCE_AND_BLOCK_TO_FT
+	//// END_ADD_MODULE_LAYER
 
 	//----------------------------------------------------------------------------
 	// Assertions

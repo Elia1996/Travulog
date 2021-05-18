@@ -24,10 +24,10 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-import cv32e40p_pkg2_ft::*;
+import cv32e40p_pkg2::*;
 import cv32e40p_pkg::*;
 
-module cv32e40p_if_stage_fsm_ft
+module cv32e40p_if_stage_fsm_logic_ft
 (
 
         // compressed decoder input output
@@ -67,18 +67,18 @@ module cv32e40p_if_stage_fsm_ft
 
         // variable for generate cycle
         generate
-                case (IFSTFS_FT)
+                case (IFSTFSLO_FT)
                         0 : begin
-                                cv32e40p_if_stage_fsm if_stage_fsm_no_ft
+                                cv32e40p_if_stage_fsm_logic if_stage_fsm_logic_no_ft
                                 (
-                                        // Input ports of if_stage_fsm_no_ft
+                                        // Input ports of if_stage_fsm_logic_no_ft
                                         .pc_set_i               (  pc_set_i[0]                      ),
                                         .fetch_valid            (  fetch_valid[0]                   ),
                                         .req_i                  (  req_i[0]                         ),
                                         .if_valid               (  if_valid[0]                      ),
                                         .aligner_ready          (  aligner_ready[0]                 ),
 
-                                        // Output ports of if_stage_fsm_no_ft
+                                        // Output ports of if_stage_fsm_logic_no_ft
                                         .branch_req             (  branch_req[0]                    ),
                                         .fetch_ready            (  fetch_ready[0]                   ),
                                         .perf_imiss_o           (  perf_imiss_o[0]                  )
@@ -89,20 +89,20 @@ module cv32e40p_if_stage_fsm_ft
                         end
                         default : begin
                                 // Input case 
-                                case (IFSTFS_TIN) 
+                                case (IFSTFSLO_TIN) 
                                         0 : begin // Single input
                                                 genvar i;
                                                 for (i=0; i<3; i=i+1)  begin 
-                                                        cv32e40p_if_stage_fsm if_stage_fsm_single_input
+                                                        cv32e40p_if_stage_fsm_logic if_stage_fsm_logic_single_input
                                                         (
-                                                                // Input ports of if_stage_fsm_single_input
+                                                                // Input ports of if_stage_fsm_logic_single_input
                                                                 .pc_set_i               (  pc_set_i[0]                      ),
                                                                 .fetch_valid            (  fetch_valid[0]                   ),
                                                                 .req_i                  (  req_i[0]                         ),
                                                                 .if_valid               (  if_valid[0]                      ),
                                                                 .aligner_ready          (  aligner_ready[0]                 ),
 
-                                                                // Output ports of if_stage_fsm_single_input
+                                                                // Output ports of if_stage_fsm_logic_single_input
                                                                 .branch_req             (  branch_req_to_vote[i]            ),
                                                                 .fetch_ready            (  fetch_ready_to_vote[i]           ),
                                                                 .perf_imiss_o           (  perf_imiss_o_to_vote[i]          )
@@ -112,16 +112,16 @@ module cv32e40p_if_stage_fsm_ft
                                         default : begin // Triplicated input
                                                 genvar i;
                                                 for (i=0; i<3; i=i+1)  begin 
-                                                        cv32e40p_if_stage_fsm if_stage_fsm_tiple_input
+                                                        cv32e40p_if_stage_fsm_logic if_stage_fsm_logic_tiple_input
                                                         (
-                                                                // Input ports of if_stage_fsm_tiple_input
+                                                                // Input ports of if_stage_fsm_logic_tiple_input
                                                                 .pc_set_i               (  pc_set_i[i]                      ),
                                                                 .fetch_valid            (  fetch_valid[i]                   ),
                                                                 .req_i                  (  req_i[i]                         ),
                                                                 .if_valid               (  if_valid[i]                      ),
                                                                 .aligner_ready          (  aligner_ready[i]                 ),
 
-                                                                // Output ports of if_stage_fsm_tiple_input
+                                                                // Output ports of if_stage_fsm_logic_tiple_input
                                                                 .branch_req             (  branch_req_to_vote[i]            ),
                                                                 .fetch_ready            (  fetch_ready_to_vote[i]           ),
                                                                 .perf_imiss_o           (  perf_imiss_o_to_vote[i]          )
@@ -131,11 +131,11 @@ module cv32e40p_if_stage_fsm_ft
                                 endcase        
 
                                  // Voter for TOVOTE signal, triple voter if
-                                 // IFSTFS_TOUT[0] == 1
+                                 // IFSTFSLO_TOUT[0] == 1
                                  cv32e40p_conf_voter
                                  #(
                                           .L1(1),
-                                          .TOUT(IFSTFS_TOUT[0])
+                                          .TOUT(IFSTFSLO_TOUT[0])
                                  ) voter_branch_req_0
                                  (
                                           .to_vote_i( branch_req_to_vote ),
@@ -147,11 +147,11 @@ module cv32e40p_if_stage_fsm_ft
                                  );
                                  
                                  // Voter for TOVOTE signal, triple voter if
-                                 // IFSTFS_TOUT[1] == 1
+                                 // IFSTFSLO_TOUT[1] == 1
                                  cv32e40p_conf_voter
                                  #(
                                           .L1(1),
-                                          .TOUT(IFSTFS_TOUT[1])
+                                          .TOUT(IFSTFSLO_TOUT[1])
                                  ) voter_fetch_ready_1
                                  (
                                           .to_vote_i( fetch_ready_to_vote ),
@@ -163,11 +163,11 @@ module cv32e40p_if_stage_fsm_ft
                                  );
                                  
                                  // Voter for TOVOTE signal, triple voter if
-                                 // IFSTFS_TOUT[2] == 1
+                                 // IFSTFSLO_TOUT[2] == 1
                                  cv32e40p_conf_voter
                                  #(
                                           .L1(1),
-                                          .TOUT(IFSTFS_TOUT[2])
+                                          .TOUT(IFSTFSLO_TOUT[2])
                                  ) voter_perf_imiss_o_2
                                  (
                                           .to_vote_i( perf_imiss_o_to_vote ),
@@ -205,11 +205,11 @@ module cv32e40p_if_stage_fsm_ft
                                         // used
                                         cv32e40p_breakage_monitor
                                         #(
-                                                .DECREMENT(IFSTFS_DECREMENT),
-                                                .INCREMENT(IFSTFS_INCREMENT),
-                                                .BREAKING_THRESHOLD(IFSTFS_BREAKING_THRESHOLD),
-                                                .COUNT_BIT(IFSTFS_COUNT_BIT),
-                                                .INC_DEC_BIT(IFSTFS_INC_DEC_BIT)
+                                                .DECREMENT(IFSTFSLO_DECREMENT),
+                                                .INCREMENT(IFSTFSLO_INCREMENT),
+                                                .BREAKING_THRESHOLD(IFSTFSLO_BREAKING_THRESHOLD),
+                                                .COUNT_BIT(IFSTFSLO_COUNT_BIT),
+                                                .INC_DEC_BIT(IFSTFSLO_INC_DEC_BIT)
                                         ) breakage_monitor
                                         (
                                                 .rst_n(rst_n),
